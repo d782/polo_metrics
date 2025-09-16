@@ -1,0 +1,14 @@
+services:
+  polo-metrics:
+    image: d782/polo-metrics:latest
+    environment:
+      INTERVAL_HOST:5
+      INTERVAL_PROCESS:5
+      INTERVAL_CONTAINER:5
+      ENABLE_HOST:"true"
+      ENABLE_PROCESS:"true"
+      ENABLE_CONTAINER:"true"
+      API_KEY:"xxxx"
+      URL_REPORTS:"localhost:3500"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
