@@ -1,113 +1,85 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
-	"strconv"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/d782/polo_metrics/cmd/model"
-	"github.com/d782/polo_metrics/internal/api"
+	"github.com/d782/polo_metrics/cmd/utils"
+	"github.com/d782/polo_metrics/cmd/worker"
 	"github.com/d782/polo_metrics/internal/metrics"
 )
 
-func RunJob(name string, intervalTime time.Duration, job func()) {
-	ticker := time.NewTicker(intervalTime)
-
-	defer ticker.Stop()
-
-	for range ticker.C {
-		log.Println("Executing ... ", name)
-		job()
-	}
-}
-
-func LoadEnv() model.ConfigMetrics {
-	intervalHost := GetNumberEnv("INTERVAL_HOST")
-	intervalProcess := GetNumberEnv("INTERVAL_PROCESS")
-	intervalContainer := GetNumberEnv("INTERVAL_CONTAINER")
-	enableHost := GetBoolEnv("ENABLE_HOST")
-	enableProcess := GetBoolEnv("ENABLE_PROCESS")
-	enableContainer := GetBoolEnv("ENABLE_CONTAINER")
-	apiKey := os.Getenv("API_KEY")
-	url := os.Getenv("URL_REPORTS")
-
-	config := model.ConfigMetrics{
-		IntervalHost:      intervalHost,
-		IntervalProcess:   intervalProcess,
-		IntervalContainer: intervalContainer,
-		EnableHost:        enableHost,
-		EnableProcess:     enableProcess,
-		EnableContainer:   enableContainer,
-		ApiKey:            apiKey,
-		UrlReports:        url,
-	}
-
-	return config
-}
-
-func GetNumberEnv(key string) int64 {
-	variable := os.Getenv(key)
-	result, err := strconv.Atoi(variable)
-	if err != nil {
-		return 5
-	}
-	return int64(result)
-}
-
-func GetBoolEnv(key string) bool {
-	variable := os.Getenv(key)
-	result, err := strconv.ParseBool(variable)
-	if err != nil {
-		return false
-	}
-	return result
-}
-
 func main() {
-	log.Println("Polo metrics agent started")
+	var wg sync.WaitGroup
+
+	log.Println("Starting polo metrics agent ...")
+	ctx, cancel := context.WithCancel(context.Background())
+
+	systemSignal := make(chan os.Signal, 1)
+	signal.Notify(systemSignal, os.Interrupt, syscall.SIGTERM)
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	go RunJob("system", 10*time.Second, func() {
-		m, err := metrics.GetMetricts()
-		if err != nil {
-			log.Println("Unable to read system metrics")
-			log.Println("... trying again")
-			time.Sleep(2 * time.Second)
-			return
-		}
+	var jobs []model.JobProcess
+	env := utils.LoadEnv(false)
+	jobs = GetJobs(jobs, env)
 
-		go api.SendReport("http://localhost:8000", "system", m, 10*time.Second)
-	})
+	for _, j := range jobs {
+		wg.Add(1)
+		go func(job model.JobProcess) {
+			defer wg.Done() // <- aquí
+			worker.RunMetricWorker(ctx, env.UrlReports, job.Path, job.Interval, job.Metric)
+		}(j)
+	}
 
-	go RunJob("process", 15*time.Second, func() {
-		processList, err := metrics.ReadProcess()
+	<-systemSignal
+	log.Println("Stopping metrics agent ...")
+	cancel()
+	wg.Wait()
+	log.Println("All workers stopped.")
+	time.Sleep(time.Second)
+}
 
-		if err != nil {
-			log.Println("Unable to read process")
-			log.Printf("... trying again")
-			time.Sleep(2 * time.Second)
-			return
-		}
-		if len(processList) > 0 {
-			api.SendReport("localhost:8000", "process", processList, 15*time.Second)
-		}
-	})
+func GetJobs(j []model.JobProcess, env model.ConfigMetrics) []model.JobProcess {
 
-	go RunJob("containers", 20*time.Second, func() {
-		containersInfo := metrics.GetContainerMetrics()
-		if len(containersInfo) > 0 {
-			api.SendReport("localhost:8000", "containers", containersInfo, 20*time.Second)
-		}
-	})
+	if env.EnableHost {
+		j = append(j, model.JobProcess{
+			Path:     "system",
+			Interval: time.Duration(env.IntervalHost) * time.Second,
+			Metric:   metrics.SystemMetrics{},
+		})
+	}
 
-	go RunJob("k8", 25*time.Second, func() {
-		k8Metrics := metrics.GetK8Metrics()
-		if len(k8Metrics) > 0 {
-			api.SendReport("localhost:8000", "k8", k8Metrics, 25*time.Second)
-		}
-	})
+	if env.EnableProcess {
+		j = append(j, model.JobProcess{
+			Path:     "process",
+			Interval: time.Duration(env.IntervalProcess) * time.Second,
+			Metric:   metrics.ProcessMetrics{},
+		})
+	}
 
-	select {}
+	if env.EnableContainer {
+		j = append(j, model.JobProcess{
+			Path:     "containers",
+			Interval: time.Duration(env.IntervalContainer) * time.Second,
+			Metric:   metrics.ContainerMetrics{},
+		})
+	}
+
+	if env.EnableK8 {
+		j = append(j, model.JobProcess{
+			Path:     "k8",
+			Interval: time.Duration(env.IntervalK8) * time.Second,
+			Metric:   metrics.KubernetesMetrics{},
+		})
+	}
+
+	return j
 }
