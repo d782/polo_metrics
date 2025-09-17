@@ -10,6 +10,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var K8Client *kubernetes.Clientset
+
 func GetK8Metrics() ([]model.K8Metrics, error) {
 	log.Println("Running K8 metrics ...")
 	config, err := rest.InClusterConfig()
