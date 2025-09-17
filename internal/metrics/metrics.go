@@ -6,26 +6,28 @@ import (
 
 	"github.com/d782/polo_metrics/internal/model"
 	"github.com/d782/polo_metrics/internal/utils"
-	"github.com/docker/docker/client"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
-	"k8s.io/client-go/kubernetes"
 )
 
-var clientDocker *client.Client
-var K8Client *kubernetes.Clientset
 var prevNetStats model.NetMetrics
-var prevContainerInfo []model.ContainerInfo
+
 var prevCpuInfo []model.CpuMetrics
 
 func GetMetricts() (model.Metrics, error) {
+	var cpuMetrics []model.CpuMetrics
+
 	log.Println("Running system metrics ...")
 	cpuPercent, err := cpu.Percent(time.Second, true)
 
-	var cpuMetrics []model.CpuMetrics
+	if err != nil {
+		return model.Metrics{}, err
+	}
 
+	info, err := host.Info()
 	if err != nil {
 		return model.Metrics{}, err
 	}
@@ -111,12 +113,17 @@ func GetMetricts() (model.Metrics, error) {
 		netMetrics.Download = float64(recvPerSec / (1024 * 1024))
 	}
 	prevNetStats = netMetrics
+
 	metrics := model.Metrics{
-		CPU:       cpuMetrics,
-		MemoryRAM: memMetrics,
-		DiskUsage: diskMetrics,
-		Timestamp: time.Now().Unix(),
-		Net:       netMetrics,
+		Name:          info.Hostname,
+		Platform:      info.Platform,
+		OS:            info.OS,
+		KernelVersion: info.KernelVersion,
+		CPU:           cpuMetrics,
+		MemoryRAM:     memMetrics,
+		DiskUsage:     diskMetrics,
+		Timestamp:     time.Now().Unix(),
+		Net:           netMetrics,
 	}
 
 	return metrics, nil

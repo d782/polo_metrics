@@ -11,6 +11,9 @@ import (
 	"github.com/docker/docker/client"
 )
 
+var clientDocker *client.Client
+var prevContainerInfo []model.ContainerInfo
+
 func GetContainerMetrics() ([]model.ContainerInfo, error) {
 	log.Println("Running container metrics ...")
 	var containerInfo []model.ContainerInfo

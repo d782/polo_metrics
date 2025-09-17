@@ -1,11 +1,15 @@
 package model
 
 type Metrics struct {
-	CPU       []CpuMetrics `json:"cpu"`
-	MemoryRAM MemMetrics   `json:"memory_ram"`
-	DiskUsage DiskMetrics  `json:"disk"`
-	Timestamp int64        `json:"timestamp"`
-	Net       NetMetrics   `json:"net_metrics"`
+	Name          string       `json:"host_name"`
+	Platform      string       `json:"platform"`
+	OS            string       `json:"os"`
+	KernelVersion string       `json:"kernel_version"`
+	CPU           []CpuMetrics `json:"cpu"`
+	MemoryRAM     MemMetrics   `json:"memory_ram"`
+	DiskUsage     DiskMetrics  `json:"disk"`
+	Timestamp     int64        `json:"timestamp"`
+	Net           NetMetrics   `json:"net_metrics"`
 }
 
 type NetMetrics struct {
