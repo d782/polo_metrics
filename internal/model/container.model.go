@@ -1,11 +1,13 @@
 package model
 
 type ContainerInfo struct {
-	Id      string           `json:"id"`
-	Logs    string           `json:"logs"`
-	CPU     uint64           `json:"cpu"`
-	Mem     uint64           `json:"memory"`
-	Network NetworkContainer `json:"network"`
+	Id       string           `json:"id"`
+	Logs     string           `json:"logs"`
+	CPU      uint64           `json:"cpu"`
+	Mem      uint64           `json:"memory"`
+	MemLimit uint64           `json:"memory_limit"`
+	MemUsage uint64           `json:"memory_usage"`
+	Network  NetworkContainer `json:"network"`
 }
 
 type NetworkContainer struct {

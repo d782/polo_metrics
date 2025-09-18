@@ -107,11 +107,13 @@ func GetContainerMetrics() ([]model.ContainerInfo, error) {
 		logsParsed := string(logBytes)
 
 		newContainerInfo := model.ContainerInfo{
-			CPU:     cpu,
-			Mem:     memory,
-			Id:      c.ID,
-			Logs:    logsParsed,
-			Network: newContainerNetwork,
+			CPU:      cpu,
+			Mem:      memory,
+			MemLimit: memLimit,
+			MemUsage: memUsage,
+			Id:       c.ID,
+			Logs:     logsParsed,
+			Network:  newContainerNetwork,
 		}
 
 		containerInfo = append(containerInfo, newContainerInfo)
